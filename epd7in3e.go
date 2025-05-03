@@ -10,16 +10,16 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/esimov/colorquant"
 	"image"
 	"image/color"
+	"time"
+
 	"periph.io/x/conn/v3"
 	"periph.io/x/conn/v3/gpio"
 	"periph.io/x/conn/v3/gpio/gpioreg"
 	"periph.io/x/conn/v3/physic"
 	"periph.io/x/conn/v3/spi"
 	"periph.io/x/conn/v3/spi/spireg"
-	"time"
 
 	"periph.io/x/host/v3"
 )
@@ -69,15 +69,23 @@ const (
 	VCM_DC_SETTING                 byte = 0x82
 )
 
-// Create a palette with the 7 colors supported by the panel
+var (
+	ColorBlack  = color.RGBA{0x00, 0x00, 0x00, 0xff}
+	ColorWhite  = color.RGBA{0xff, 0xff, 0xff, 0xff}
+	ColorYellow = color.RGBA{0xff, 0xff, 0x00, 0xff}
+	ColorRed    = color.RGBA{0xff, 0x00, 0x00, 0xff}
+	ColorBlue   = color.RGBA{0x00, 0x00, 0xff, 0xff}
+	ColorGreen  = color.RGBA{0x00, 0xff, 0x00, 0xff}
+)
+
+// ColorPalette with the 7 colors supported by the panel
 var ColorPalette = color.Palette{
-	color.RGBA{0x00, 0x00, 0x00, 0xff}, // BLACK
-	color.RGBA{0xff, 0xff, 0xff, 0xff}, // WHITE
-	color.RGBA{0xff, 0xff, 0x00, 0xff}, // YELLOW
-	color.RGBA{0xff, 0x00, 0x00, 0xff}, // RED
-	color.RGBA{0x00, 0x00, 0xff, 0xff}, // BLUE
-	color.RGBA{0x00, 0xff, 0x00, 0xff}, // GREEN
-	// color.RGBA{0xff, 0x80, 0x00, 0xff}, // ORANGE
+	ColorBlack,
+	ColorWhite,
+	ColorYellow,
+	ColorRed,
+	ColorBlue,
+	ColorGreen,
 }
 
 var ColorPaletteBinary = []uint8{
@@ -207,7 +215,6 @@ func (e *Epd) Reset() {
 	time.Sleep(2 * time.Millisecond)
 	e.rst.Out(gpio.High)
 	time.Sleep(20 * time.Millisecond)
-	fmt.Println("EPD Reset complete.")
 }
 
 func (e *Epd) sendCommand(cmd byte) {
@@ -215,7 +222,6 @@ func (e *Epd) sendCommand(cmd byte) {
 	e.cs.Out(gpio.Low)
 	e.c.Tx([]byte{cmd}, nil)
 	e.cs.Out(gpio.High)
-	fmt.Printf("Command sent: 0x%X\n", cmd)
 }
 
 func (e *Epd) sendData(data ...byte) {
@@ -223,7 +229,6 @@ func (e *Epd) sendData(data ...byte) {
 	e.cs.Out(gpio.Low)
 	e.c.Tx(data, nil)
 	e.cs.Out(gpio.High)
-	fmt.Printf("Data sent: 0x%X\n", data)
 }
 
 func (e *Epd) waitUntilIdle() {
@@ -231,7 +236,7 @@ func (e *Epd) waitUntilIdle() {
 	for {
 		select {
 		case <-timeout:
-			panic("epd: waitUntilIdle timeout after 5 second")
+			panic("epd: waitUntilIdle timed out")
 		default:
 			if e.busy.Read() != gpio.Low {
 				return
@@ -389,48 +394,19 @@ func rotateImage90(img image.Image) image.Image {
 
 // quantizeImage converts an image to a quantized version using the given palette.
 func quantizeImage(img image.Image, palette color.Palette) *image.Paletted {
-	/*
-		bounds := img.Bounds()
-		quantized := image.NewPaletted(bounds, palette)
+	bounds := img.Bounds()
+	quantized := image.NewPaletted(bounds, palette)
 
-		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-			for x := bounds.Min.X; x < bounds.Max.X; x++ {
-				originalColor := img.At(x, y)
-				closestColor := palette.Convert(originalColor)
-				quantized.Set(x, y, closestColor)
-			}
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			originalColor := img.At(x, y)
+			closestColor := palette.Convert(originalColor)
+			quantized.Set(x, y, closestColor)
 		}
-
-		return quantized
-	*/
-	ditherer := colorquant.Dither{
-		[][]float32{
-			[]float32{0.0, 0.0, 0.0, 7.0 / 48.0, 5.0 / 48.0},
-			[]float32{3.0 / 48.0, 5.0 / 48.0, 7.0 / 48.0, 5.0 / 48.0, 3.0 / 48.0},
-			[]float32{1.0 / 48.0, 3.0 / 48.0, 5.0 / 48.0, 3.0 / 48.0, 1.0 / 48.0},
-		},
 	}
 
-	dst := image.NewPaletted(img.Bounds(), palette)
-
-	return ditherer.Quantize(img, dst, len(palette), true, true).(*image.Paletted)
+	return quantized
 }
-
-/*
-func quantizeImage(img image.Image, palette color.Palette) *image.Paletted {
-	// 2. Erstelle ein neues Paletted-Bild mit den gleichen Dimensionen wie das Originalbild.
-	//    Ein Paletted-Bild speichert die Farbdaten als Indices in der Palette.
-	bounds := img.Bounds()
-	imgQuantized := image.NewPaletted(bounds, palette)
-
-	// 3. Zeichne das Originalbild auf das Paletted-Bild. Dabei wird für jedes Pixel
-	//    die ähnlichste Farbe aus der Palette ausgewählt und der entsprechende Index
-	//    im Paletted-Bild gespeichert.
-	draw.Draw(imgQuantized, bounds, img, image.Point{}, draw.Src)
-
-	return imgQuantized
-}
-*/
 
 // Display sends the image to the display.
 func (e *Epd) Display(img image.Image) {

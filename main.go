@@ -2,10 +2,23 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"embed"
 	"fmt"
-	"github.com/ophusdev/openmeteogo"
 	"log"
+	"time"
+
+	"github.com/BurntSushi/toml"
+	ics "github.com/arran4/golang-ical"
+	"github.com/ophusdev/openmeteogo"
+)
+
+var (
+	//go:embed fonts
+	fontsFS embed.FS
+	//go:embed icons
+	iconsFS embed.FS
+	//go:embed config/config.toml
+	configFS embed.FS
 )
 
 // Define the GPIO pins used for the display.
@@ -14,16 +27,34 @@ const (
 	dcPin    = 22 // Replace with your actual data/command pin number (BCM)
 	busyPin  = 18 // Replace with your actual busy pin number (BCM)
 	csPin    = 24 // Replace with your actual chip select pin number (BCM)
+
+	calendarEventCount = 7 // Number of calendar events to display
 )
 
 func main() {
 	ctx := context.Background()
 
+	// Load the configuration from a TOML file.
+	cfgBytes, err := configFS.ReadFile("config/config.toml")
+	if err != nil {
+		log.Fatalf("failed to load config file: %v", err)
+	}
+
+	var cfg config
+	if _, err = toml.Decode(string(cfgBytes), &cfg); err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
+
 	client := openmeteogo.NewClient(nil)
 
+	appointments, err := buildAppointments(cfg.GetCalendars())
+	if err != nil {
+		log.Fatalf("failed to build appointments: %v", err)
+	}
+
 	opts := &openmeteogo.DailyOptions{
-		Latitude:     47.0321,
-		Longitude:    8.4322,
+		Latitude:     cfg.Weather.Latitude,
+		Longitude:    cfg.Weather.Longitude,
 		ForecastDays: 1,
 		Options: openmeteogo.Options{
 			Timezone:          openmeteogo.TimezoneBerlin,
@@ -38,6 +69,7 @@ func main() {
 			openmeteogo.DailySunrise,
 			openmeteogo.DailySunset,
 			openmeteogo.DailyPrecipitationSum,
+			openmeteogo.DailyPrecipitationProbabilityMax,
 		},
 	}
 
@@ -46,18 +78,20 @@ func main() {
 		log.Fatal(err)
 	}
 
-	config := NewDefaultConfig()
-	config.Quote = fetchQuote()
-	config.Weather = Weather{
-		TemperatureLow:   forecast.Daily.Temperature2mMin[0],
-		TemperatureHigh:  forecast.Daily.Temperature2mMax[0],
-		WeatherCode:      forecast.Daily.WeatherCode[0],
-		Sunrise:          forecast.Daily.Sunrise[0],
-		Sunset:           forecast.Daily.Sunset[0],
-		PrecipitationSum: forecast.Daily.PrecipitationSum[0],
+	dashboardConfig := NewDefaultConfig()
+	dashboardConfig.Quote = fetchQuote()
+	dashboardConfig.Appointments = appointments
+	dashboardConfig.Weather = Weather{
+		TemperatureLow:           forecast.Daily.Temperature2mMin[0],
+		TemperatureHigh:          forecast.Daily.Temperature2mMax[0],
+		WeatherCode:              forecast.Daily.WeatherCode[0],
+		Sunrise:                  parseTime(forecast.Daily.Sunrise[0]),
+		Sunset:                   parseTime(forecast.Daily.Sunset[0]),
+		PrecipitationSum:         forecast.Daily.PrecipitationSum[0],
+		PrecipitationProbability: forecast.Daily.PrecipitationProbabilityMax[0],
 	}
 
-	canvas, err := GenerateDashboard(config)
+	canvas, err := GenerateDashboard(dashboardConfig)
 	if err != nil {
 		fmt.Println("Error generating dashboard:", err)
 		return
@@ -69,41 +103,73 @@ func main() {
 		return
 	}
 
-	fmt.Println("Dashboard image saved as dash.png")
-	s, _ := json.MarshalIndent(forecast, "", "\t")
+	epd, err := New(pin(dcPin), pin(csPin), pin(resetPin), pin(busyPin))
+	if err != nil {
+		log.Fatalf("failed to connect to display: %v", err)
+	}
 
-	fmt.Print(string(s))
+	log.Println("Initializing the display...")
+	epd.Init()
 
-	return
+	time.Sleep(1 * time.Second)
 
-	/*
-		epd, err := New(pin(dcPin), pin(csPin), pin(resetPin), pin(busyPin))
+	log.Println("Clearing...")
+	epd.Clear()
+
+	time.Sleep(1 * time.Second)
+
+	log.Println("Displaying image...")
+	epd.Display(canvas.Image())
+
+	log.Println("Quitting...")
+	epd.Sleep()
+}
+
+// parseTime turns an open-meteo time string into a time.Time object.
+func parseTime(s *string) time.Time {
+	if s == nil {
+		return time.Time{}
+	}
+	t, err := time.Parse("2006-01-02T15:04", *s)
+	if err != nil {
+		log.Printf("failed to parse time: %v", err)
+		return time.Time{}
+	}
+	return t
+}
+
+// buildAppointments fetches the upcoming appointments from the calendars.
+func buildAppointments(cals Calendars) ([]*Appointment, error) {
+	var err error
+	var start time.Time
+	var appointments []*Appointment
+
+	events, err := cals.MergedEvents(time.Now().Add(2 * 24 * time.Hour))
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch merged events: %w", err)
+	}
+
+	for _, event := range events {
+		start, err = event.GetStartAt()
 		if err != nil {
-			log.Fatalf("EPD initialization failed: %v", err)
+			return nil, fmt.Errorf("failed to get start time: %w", err)
 		}
 
-		log.Println("Initializing the display...")
-		epd.Init()
+		appointments = append(appointments, &Appointment{
+			Title: event.GetProperty(ics.ComponentPropertySummary).Value,
+			Start: start,
+			Tag:   event.Tag,
+			Color: event.Color,
+		})
 
-		time.Sleep(2 * time.Second)
+		if len(appointments) == calendarEventCount {
+			break
+		}
+	}
 
-		log.Println("Clearing...")
-		epd.Clear()
-
-		time.Sleep(2 * time.Second)
-		log.Println("Displaying image...")
-		epd.Display(nil)
-
-		log.Println("Quitting...")
-		epd.Sleep()
-
-	*/
+	return appointments, nil
 }
 
 func pin(pinNumber int) string {
 	return fmt.Sprintf("P1_%d", pinNumber)
-}
-
-func convertImage() error {
-	return nil
 }

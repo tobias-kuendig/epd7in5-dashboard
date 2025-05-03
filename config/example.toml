@@ -1,0 +1,15 @@
+# Save this as config.toml
+[weather]
+Latitude = 20.1234
+Longitude = 8.4321
+
+[[calendars]]
+name = "AB" # keep it short (e.g., initials)
+color = "blue" # black, white, yellow, red, green, blue
+url = "https://calendar.google.com/calendar/ical/your-private-feed-url/basic.ics"
+
+[[calendars]]
+name = "AB" # keep it short (e.g., initials)
+color = "red"
+url = "https://calendar.google.com/calendar/ical/your-private-feed-url/basic.ics"
+

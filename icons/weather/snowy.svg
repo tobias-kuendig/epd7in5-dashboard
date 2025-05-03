@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- (c) ammap.com | SVG weather icons -->
+
+<svg
+   width="150"
+   height="150"
+   version="1.1"
+   id="svg5"
+   sodipodi:docname="snowy.svg"
+   inkscape:version="1.4 (e7c3feb100, 2024-10-09)"
+   inkscape:export-filename="snow-and-rain.png"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview5"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="5.6716565"
+     inkscape:cx="75.639278"
+     inkscape:cy="84.807675"
+     inkscape:window-width="3440"
+     inkscape:window-height="1371"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g4" />
+  <defs
+     id="defs2" />
+  <g
+     transform="translate(16,-2)"
+     filter="url(#blur)"
+     id="g5">
+    <g
+       class="am-weather-cloud-3"
+       id="g2"
+       transform="matrix(3.9438998,0,0,3.9438998,13.154836,-25.553332)">
+      <path
+         transform="translate(-20,-11)"
+         d="m 47.7,35.4 c 0,-4.6 -3.7,-8.2 -8.2,-8.2 -1,0 -1.9,0.2 -2.8,0.5 -0.3,-3.4 -3.1,-6.2 -6.6,-6.2 -3.7,0 -6.7,3 -6.7,6.7 0,0.8 0.2,1.6 0.4,2.3 -0.3,-0.1 -0.7,-0.1 -1,-0.1 -3.7,0 -6.7,3 -6.7,6.7 0,3.6 2.9,6.6 6.5,6.7 h 17.2 c 4.4,-0.5 7.9,-4 7.9,-8.4 z"
+         fill="#57a0ee"
+         stroke="#ffffff"
+         stroke-linejoin="round"
+         stroke-width="1.2"
+         id="path2"
+         style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:1.01422455;stroke-dasharray:none;stroke-opacity:1" />
+    </g>
+    <g
+       class="am-weather-rainy-3"
+       transform="matrix(3.9004099,0.62956181,-0.68774751,3.5704224,56.553704,115.97974)"
+       fill="none"
+       stroke="#91c0f8"
+       stroke-dasharray="4, 4"
+       stroke-linecap="round"
+       stroke-width="2"
+       id="g4"
+       style="stroke:#0000ff;stroke-width:1.01422;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1">
+      <g
+         class="am-weather-snow-1"
+         id="g9"
+         transform="matrix(0.81036281,-0.14288884,0.15609497,0.88525858,-14.284515,-28.061207)"
+         style="fill:none;stroke:#000000;stroke-width:0.802864;stroke-dasharray:none;stroke-opacity:1">
+        <g
+           transform="translate(1,28)"
+           fill="none"
+           stroke="#57a0ee"
+           stroke-linecap="round"
+           id="g8"
+           style="fill:none;stroke:#000000;stroke-width:0.613682;stroke-dasharray:none;stroke-opacity:1">
+          <line
+             transform="translate(0,9)"
+             y1="-2.5"
+             y2="2.5"
+             stroke-width="1.2"
+             id="line5"
+             x1="0"
+             x2="0"
+             style="fill:none;stroke:#000000;stroke-width:0.613682;stroke-dasharray:none;stroke-opacity:1" />
+          <line
+             transform="rotate(45,-10.864,4.5)"
+             y1="-2.5"
+             y2="2.5"
+             id="line6"
+             x1="0"
+             x2="0"
+             style="fill:none;stroke:#000000;stroke-width:0.613682;stroke-dasharray:none;stroke-opacity:1" />
+          <line
+             transform="rotate(90,-4.5,4.5)"
+             y1="-2.5"
+             y2="2.5"
+             id="line7"
+             x1="0"
+             x2="0"
+             style="fill:none;stroke:#000000;stroke-width:0.613682;stroke-dasharray:none;stroke-opacity:1" />
+          <line
+             transform="rotate(135,-1.864,4.5)"
+             y1="-2.5"
+             y2="2.5"
+             id="line8"
+             x1="0"
+             x2="0"
+             style="fill:none;stroke:#000000;stroke-width:0.613682;stroke-dasharray:none;stroke-opacity:1" />
+        </g>
+      </g>
+      <g
+         class="am-weather-snow-2"
+         id="g13"
+         transform="matrix(0.81036281,-0.14288884,0.15609497,0.88525858,-14.737335,-28.992776)"
+         style="fill:none;stroke:#000000;stroke-width:0.613682;stroke-dasharray:none;stroke-opacity:1">
+        <g
+           transform="translate(21,28)"
+           fill="none"
+           stroke="#57a0ee"
+           stroke-linecap="round"
+           id="g12"
+           style="fill:none;stroke:#000000;stroke-width:0.613682;stroke-dasharray:none;stroke-opacity:1">
+          <line
+             transform="translate(0,9)"
+             y1="-2.5"
+             y2="2.5"
+             stroke-width="1.2"
+             id="line9"
+             x1="0"
+             x2="0"
+             style="fill:none;stroke:#000000;stroke-width:0.613682;stroke-dasharray:none;stroke-opacity:1" />
+          <line
+             transform="rotate(45,-10.864,4.5)"
+             y1="-2.5"
+             y2="2.5"
+             id="line10"
+             x1="0"
+             x2="0"
+             style="fill:none;stroke:#000000;stroke-width:0.613682;stroke-dasharray:none;stroke-opacity:1" />
+          <line
+             transform="rotate(90,-4.5,4.5)"
+             y1="-2.5"
+             y2="2.5"
+             id="line11"
+             x1="0"
+             x2="0"
+             style="fill:none;stroke:#000000;stroke-width:0.613682;stroke-dasharray:none;stroke-opacity:1" />
+          <line
+             transform="rotate(135,-1.864,4.5)"
+             y1="-2.5"
+             y2="2.5"
+             id="line12"
+             x1="0"
+             x2="0"
+             style="fill:none;stroke:#000000;stroke-width:0.613682;stroke-dasharray:none;stroke-opacity:1" />
+        </g>
+      </g>
+      <g
+         class="am-weather-snow-1"
+         id="g17"
+         transform="matrix(0.81036281,-0.14288884,0.15609497,0.88525858,-6.5555225,-31.399325)"
+         style="fill:none;stroke:#000000;stroke-width:0.802864;stroke-dasharray:none;stroke-opacity:1">
+        <g
+           transform="translate(1,28)"
+           fill="none"
+           stroke="#57a0ee"
+           stroke-linecap="round"
+           id="g16"
+           style="fill:none;stroke:#000000;stroke-width:0.613682;stroke-dasharray:none;stroke-opacity:1">
+          <line
+             transform="translate(0,9)"
+             y1="-2.5"
+             y2="2.5"
+             stroke-width="1.2"
+             id="line13"
+             x1="0"
+             x2="0"
+             style="fill:none;stroke:#000000;stroke-width:0.613682;stroke-dasharray:none;stroke-opacity:1" />
+          <line
+             transform="rotate(45,-10.864,4.5)"
+             y1="-2.5"
+             y2="2.5"
+             id="line14"
+             x1="0"
+             x2="0"
+             style="fill:none;stroke:#000000;stroke-width:0.613682;stroke-dasharray:none;stroke-opacity:1" />
+          <line
+             transform="rotate(90,-4.5,4.5)"
+             y1="-2.5"
+             y2="2.5"
+             id="line15"
+             x1="0"
+             x2="0"
+             style="fill:none;stroke:#000000;stroke-width:0.613682;stroke-dasharray:none;stroke-opacity:1" />
+          <line
+             transform="rotate(135,-1.864,4.5)"
+             y1="-2.5"
+             y2="2.5"
+             id="line16"
+             x1="0"
+             x2="0"
+             style="fill:none;stroke:#000000;stroke-width:0.613682;stroke-dasharray:none;stroke-opacity:1" />
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

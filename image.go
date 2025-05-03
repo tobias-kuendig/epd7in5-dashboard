@@ -5,20 +5,24 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"os"
+	"io"
 	"strings"
 	"time"
 
 	"github.com/fogleman/gg"
+	"github.com/golang/freetype/truetype"
 	"github.com/nfnt/resize"
 )
+
+// fontName is the name of the font used in the dashboard image.
+const fontName = "InterDisplay"
 
 // FontStyle represents the style of a font (Regular, Bold, etc.)
 type FontStyle string
 
 const (
 	// FontRegular represents the regular font style
-	FontRegular FontStyle = "Regular"
+	FontRegular FontStyle = "SemiBold"
 	// FontBold represents the bold font style
 	FontBold FontStyle = "Bold"
 )
@@ -27,12 +31,11 @@ const (
 type FontSize int
 
 const (
-	// FontSizeSmall is a small font size (16pt)
-	FontSizeSmall FontSize = 16
-	// FontSizeMedium is a medium font size (24pt)
-	FontSizeMedium = 24
-	// FontSizeLarge is a large font size (32pt)
-	FontSizeLarge = 32
+	FontSizeXXS FontSize = 14
+	FontSizeSM  FontSize = 17
+	FontSizeS   FontSize = 20
+	FontSizeM            = 28
+	FontSizeL            = 38
 )
 
 // German month names
@@ -72,13 +75,13 @@ var weatherConditions = map[int]string{
 	51: "Leichter Nieselregen",
 	53: "Nieselregen",
 	55: "Starker Nieselregen",
-	56: "Gefrierender Nieselregen: Leicht",
-	57: "Gefrierender Nieselregen: Stark",
+	56: "Leichter gefr. Nieselregen",
+	57: "Starker gefr. Nieselregen",
 	61: "Leichter Regen",
 	63: "Regen",
 	65: "Starker Regen",
-	66: "Gefrierender Regen: Leicht",
-	67: "Gefrierender Regen: Stark",
+	66: "Leichter gefr. Regen",
+	67: "Leichter gefr. Regen",
 	71: "Leichter Schneefall",
 	73: "Schneefall",
 	75: "Starker Schneefall",
@@ -89,8 +92,23 @@ var weatherConditions = map[int]string{
 	85: "Leichter Schneeschauer",
 	86: "Starker Schneeschauer",
 	95: "Gewitter",
-	96: "Gewitter mit leichtem Hagel",
+	96: "Gewitter mit Hagel",
 	99: "Gewitter mit starkem Hagel",
+}
+
+var weatherIcons = map[string][]int{
+	"sunny":         {0},
+	"sunny-cloudy":  {1, 2},
+	"cloudy":        {3},
+	"foggy":         {45, 48},
+	"rainy-1":       {51, 61, 80},
+	"rainy-2":       {53, 63, 81},
+	"rainy-3":       {55, 65, 82},
+	"snow-and-rain": {56, 57, 66, 67},
+	"snowy-1":       {71, 85},
+	"snowy-2":       {73, 77},
+	"snowy-3":       {75, 86},
+	"stormy":        {95, 96, 99},
 }
 
 // localeDate formats a time.Time as a German date string (e.g., "1. Januar 2023")
@@ -113,6 +131,11 @@ func relativeDate(t time.Time) string {
 		return "Morgen, " + t.Format("15:04")
 	}
 
+	// All-day events.
+	if t.Hour() == 0 && t.Minute() == 0 {
+		return fmt.Sprintf("%s", days[t.Weekday()])
+	}
+
 	return fmt.Sprintf("%s, %s", days[t.Weekday()], t.Format("15:04"))
 }
 
@@ -122,6 +145,10 @@ type Appointment struct {
 	Title string
 	// Start is the date and time when the appointment begins
 	Start time.Time
+	// Tag is a tag for the appointment
+	Tag string
+	// Color is the color associated with the appointment
+	Color color.Color
 }
 
 // Default dashboard dimensions and layout constants
@@ -142,14 +169,10 @@ type DashboardConfig struct {
 	Height int
 	// Padding is the padding around elements in pixels
 	Padding int
-	// WeatherIconPath is the path to the weather icon to display
-	WeatherIconPath string
-	// WeatherCondition is the text description of the weather
-	WeatherCondition string
 	// Temperature is the temperature range to display
 	Temperature string
 	// Appointments is the list of appointments to display
-	Appointments []Appointment
+	Appointments []*Appointment
 	// Quote is the quote of the day to display
 	Quote   quote
 	Weather Weather
@@ -157,34 +180,45 @@ type DashboardConfig struct {
 
 // Weather represents the weather data structure
 type Weather struct {
-	TemperatureLow   *float64
-	TemperatureHigh  *float64
-	WeatherCode      *int32
-	Sunrise          *string
-	Sunset           *string
-	PrecipitationSum *float64
+	TemperatureLow           *float64
+	TemperatureHigh          *float64
+	WeatherCode              *int32
+	Sunrise                  time.Time
+	Sunset                   time.Time
+	PrecipitationSum         *float64
+	PrecipitationProbability *float64
+}
+
+func (w Weather) Icon() string {
+	if w.WeatherCode == nil {
+		return ""
+	}
+	for icon, codes := range weatherIcons {
+		for _, code := range codes {
+			if int(*w.WeatherCode) == code {
+				return fmt.Sprintf("icons/weather/%s.png", icon)
+			}
+		}
+	}
+	return "icons/weather/unknown.png"
+}
+
+func (w Weather) Condition() string {
+	if w.WeatherCode == nil {
+		return ""
+	}
+	return weatherConditions[int(*w.WeatherCode)]
 }
 
 // NewDefaultConfig creates a new DashboardConfig with default values
 func NewDefaultConfig() *DashboardConfig {
 	return &DashboardConfig{
-		Width:            DefaultWidth,
-		Height:           DefaultHeight,
-		Padding:          DefaultPadding,
-		WeatherIconPath:  "./icons/weather/1530392_weather_sun_sunny_temperature.png",
-		WeatherCondition: "Sonning",
-		Temperature:      "5-23°",
-		Appointments: []Appointment{
-			{
-				Title: "Arzt",
-				Start: time.Date(2023, 10, 1, 14, 0, 0, 0, time.UTC),
-			},
-			{
-				Title: "Meeting",
-				Start: time.Date(2023, 10, 2, 9, 0, 0, 0, time.UTC),
-			},
-		},
-		Quote: quote{},
+		Width:        DefaultWidth,
+		Height:       DefaultHeight,
+		Padding:      DefaultPadding,
+		Appointments: []*Appointment{},
+		Quote:        quote{},
+		Weather:      Weather{},
 	}
 }
 
@@ -197,7 +231,7 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 
 	dc := gg.NewContext(config.Width, config.Height)
 
-	err := setFont(dc, FontRegular, FontSizeSmall)
+	err := setFont(dc, FontRegular, FontSizeSM)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set initial font: %w", err)
 	}
@@ -219,7 +253,7 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 	dc.Stroke()
 
 	// Heading
-	err = setFont(dc, FontBold, FontSizeMedium)
+	err = setFont(dc, FontBold, FontSizeM)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set heading font: %w", err)
 	}
@@ -227,30 +261,30 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 	dc.DrawStringAnchored(
 		localeDate(time.Now()),
 		float64(config.Width/2),
-		float64(config.Padding+50),
+		float64(config.Padding+40),
 		0.5, 0.5,
 	)
 
-	currentOffset := 140
+	offsetTop := 110
 
 	// Weather Icon
-	imageWidth := 100
-	gap := 18
+	imageWidth := 150
+	gap := 12
 	err = addImage(
 		dc,
-		config.WeatherIconPath,
-		image.Point{X: config.Width/2 - imageWidth/2 - gap, Y: currentOffset},
-		imageWidth, imageWidth,
+		config.Weather.Icon(),
+		image.Point{X: config.Width/2 - imageWidth/2 - gap, Y: offsetTop},
+		imageWidth, 0,
 		.5, 0,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error adding weather icon: %w", err)
 	}
 
-	currentOffset += imageWidth / 2
+	offsetTop += 52
 
 	// Weather Condition
-	err = setFont(dc, FontRegular, FontSizeSmall)
+	err = setFont(dc, FontRegular, FontSizeSM)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set weather condition font: %w", err)
 	}
@@ -259,75 +293,155 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 	dc.SetColor(color.Black)
 	_, textH := dc.MeasureString(condition)
 
+	offsetLeft := float64(config.Width/2 + gap)
 	dc.DrawStringAnchored(
 		condition,
-		float64(config.Width/2+gap),
-		float64(currentOffset)-textH,
+		offsetLeft,
+		float64(offsetTop)-textH,
 		0, 0,
 	)
 
 	// Temperature
-	currentOffset += int(textH) + 16
+	offsetTop += int(textH) + 7
 
-	err = setFont(dc, FontBold, FontSizeLarge)
+	err = setFont(dc, FontBold, FontSizeL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set temperature font: %w", err)
 	}
 	dc.SetColor(color.Black)
 	dc.DrawStringAnchored(
 		fmt.Sprintf("%d-%d°", int(*config.Weather.TemperatureLow), int(*config.Weather.TemperatureHigh)),
-		float64(config.Width/2+gap),
-		float64(currentOffset),
+		offsetLeft,
+		float64(offsetTop),
 		0, 0,
 	)
 
-	// Appointments
-	currentOffset += 100
+	// Weather Precipitation
+	offsetTop += 50
+	err = setFont(dc, FontRegular, FontSizeSM)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set precipitation font: %w", err)
+	}
 
-	err = drawHeading(dc, "Termine", currentOffset, config.Width, config.Padding)
+	err = addImage(
+		dc,
+		"icons/weather/umbrella.png",
+		image.Point{X: int(offsetLeft), Y: offsetTop},
+		22, 0,
+		0.0,
+		1,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error adding parcipitation icon: %w", err)
+	}
+
+	dc.SetColor(color.Black)
+	dc.DrawStringAnchored(
+		fmt.Sprintf("%d%% / %.1fmm", int(*config.Weather.PrecipitationProbability), *config.Weather.PrecipitationSum),
+		offsetLeft+30,
+		float64(offsetTop),
+		0, -.4,
+	)
+
+	offsetTop += 32
+
+	err = addImage(
+		dc,
+		"icons/weather/sun.png",
+		image.Point{X: int(offsetLeft), Y: offsetTop},
+		22, 0,
+		0.0,
+		1,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error adding parcipitation icon: %w", err)
+	}
+
+	dc.SetColor(color.Black)
+	dc.DrawStringAnchored(
+		fmt.Sprintf("↑ %s    ↓ %s", config.Weather.Sunrise.Format("15:04"), config.Weather.Sunset.Format("15:04")),
+		offsetLeft+30,
+		float64(offsetTop),
+		0, -.3,
+	)
+
+	// Appointments
+	offsetTop = 330
+
+	err = drawHeading(dc, "Termine", offsetTop, config.Width, config.Padding)
 	if err != nil {
 		return nil, fmt.Errorf("failed to draw appointments heading: %w", err)
 	}
 
-	currentOffset += 12
+	offsetTop += 18
 	spacing := 14
 
-	for _, appointment := range config.Appointments {
-		currentOffset += int(textH) + spacing
+	tagWidth := 30.0
+	tagHeight := 20.0
 
-		err = setFont(dc, FontRegular, FontSizeSmall)
+	for _, appointment := range config.Appointments {
+		err = setFont(dc, FontBold, FontSizeXXS)
 		if err != nil {
 			return nil, fmt.Errorf("failed to set appointment font: %w", err)
 		}
+
+		offsetTop += int(textH) + spacing
+		offsetLeft = float64(config.Padding * 2)
+
+		dc.SetColor(appointment.Color)
+		dc.DrawRoundedRectangle(
+			offsetLeft,
+			float64(offsetTop)-(tagHeight-4),
+			tagWidth,
+			tagHeight,
+			4,
+		)
+		dc.Fill()
+
+		dc.SetColor(ColorWhite)
+		dc.DrawStringAnchored(
+			appointment.Tag,
+			offsetLeft+tagWidth/2,
+			float64(offsetTop),
+			.5, -.1,
+		)
+
+		err = setFont(dc, FontRegular, FontSizeSM)
+		if err != nil {
+			return nil, fmt.Errorf("failed to set appointment font: %w", err)
+		}
+
+		offsetLeft += tagWidth + 10
+
 		dc.SetColor(color.Black)
 		dc.DrawStringAnchored(
-			appointment.Title,
-			float64(config.Padding*2),
-			float64(currentOffset),
+			limit(appointment.Title, 20),
+			offsetLeft,
+			float64(offsetTop),
 			0, 0,
 		)
 
 		dc.DrawStringAnchored(
 			relativeDate(appointment.Start),
 			float64(config.Width-config.Padding*2),
-			float64(currentOffset),
+			float64(offsetTop),
 			1, 0,
 		)
 	}
 
-	// Footer (drawn from bottom)
-	currentOffset = 610
+	// Footer
+	offsetTop = 640
 
-	err = drawHeading(dc, "Zitat des Tages", currentOffset, config.Width, config.Padding)
+	err = drawHeading(dc, "Zitat des Tages", offsetTop, config.Width, config.Padding)
 	if err != nil {
 		return nil, fmt.Errorf("failed to draw quote heading: %w", err)
 	}
 
-	currentOffset += 32
+	offsetTop += 30
 
 	lines := dc.WordWrap(config.Quote.Text, float64(config.Width-4*config.Padding))
 
-	err = setFont(dc, FontRegular, FontSizeSmall)
+	err = setFont(dc, FontRegular, FontSizeSM)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set quote font: %w", err)
 	}
@@ -336,7 +450,7 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 	dc.DrawStringWrapped(
 		config.Quote.Text,
 		float64(config.Padding*2),
-		float64(currentOffset),
+		float64(offsetTop),
 		0, 0,
 		float64(config.Width-4*config.Padding),
 		1.5,
@@ -344,16 +458,24 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 	)
 	_, textH = dc.MeasureMultilineString(strings.Join(lines, "\n"), 1.5)
 
-	currentOffset += int(textH) + 30
+	offsetTop += int(textH) + 25
 
 	dc.DrawStringAnchored(
 		config.Quote.Author,
 		float64(config.Width-config.Padding*2),
-		float64(currentOffset),
+		float64(offsetTop),
 		1, 0,
 	)
 
 	return dc, nil
+}
+
+// limit limits the length of a string to a maximum number of characters
+func limit(s string, length int) string {
+	if len(s) > length {
+		s = s[:length] + "..."
+	}
+	return s
 }
 
 // drawHeading draws a section heading with a line underneath
@@ -363,7 +485,7 @@ func drawHeading(dc *gg.Context, text string, currentOffset int, width, padding 
 		return fmt.Errorf("canvas is nil")
 	}
 
-	err := setFont(dc, FontBold, FontSizeSmall)
+	err := setFont(dc, FontBold, FontSizeS)
 	if err != nil {
 		return fmt.Errorf("failed to set heading font: %w", err)
 	}
@@ -371,11 +493,9 @@ func drawHeading(dc *gg.Context, text string, currentOffset int, width, padding 
 	dc.SetColor(color.Black)
 	dc.DrawStringAnchored(text, float64(padding*2), float64(currentOffset), 0, 0)
 
-	_, textH := dc.MeasureString(text)
-
 	// Border
 	dc.SetColor(color.Black)
-	dc.DrawRectangle(float64(2*padding), float64(currentOffset)+textH, float64(width-4*padding), 2.0)
+	dc.DrawRectangle(float64(2*padding), float64(currentOffset)+10, float64(width-4*padding), 2.0)
 	dc.Fill()
 
 	return nil
@@ -388,7 +508,7 @@ func addImage(canvas *gg.Context, path string, point image.Point, width, height 
 		return fmt.Errorf("canvas is nil")
 	}
 
-	templateFile, err := os.Open(path)
+	templateFile, err := iconsFS.Open(path)
 	if err != nil {
 		return fmt.Errorf("failed to open image file %s: %w", path, err)
 	}
@@ -412,11 +532,28 @@ func setFont(canvas *gg.Context, style FontStyle, size FontSize) error {
 		return fmt.Errorf("canvas is nil")
 	}
 
-	fontPath := fmt.Sprintf("./fonts/Inter-%s.ttf", style)
-	err := canvas.LoadFontFace(fontPath, float64(size))
+	fontPath := fmt.Sprintf("fonts/%s-%s.ttf", fontName, style)
+
+	fontFace, err := fontsFS.Open(fontPath)
 	if err != nil {
-		return fmt.Errorf("failed to load font %s: %w", fontPath, err)
+		return fmt.Errorf("failed to open font file %s: %w", fontPath, err)
 	}
+
+	fontBytes, err := io.ReadAll(fontFace)
+	if err != nil {
+		return fmt.Errorf("failed to read font file %s: %w", fontPath, err)
+	}
+
+	f, err := truetype.Parse(fontBytes)
+	if err != nil {
+		return fmt.Errorf("failed to parse font file %s: %w", fontPath, err)
+	}
+
+	face := truetype.NewFace(f, &truetype.Options{
+		Size: float64(size),
+	})
+
+	canvas.SetFontFace(face)
 
 	return nil
 }

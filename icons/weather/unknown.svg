@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- (c) ammap.com | SVG weather icons -->
+
+<svg
+   width="150"
+   height="150"
+   version="1.1"
+   id="svg5"
+   sodipodi:docname="unknown.svg"
+   inkscape:version="1.4 (e7c3feb100, 2024-10-09)"
+   inkscape:export-filename="unknown.png"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview5"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="5.6716565"
+     inkscape:cx="75.639278"
+     inkscape:cy="84.807675"
+     inkscape:window-width="3440"
+     inkscape:window-height="1371"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g5" />
+  <defs
+     id="defs2" />
+  <g
+     transform="translate(16,-2)"
+     filter="url(#blur)"
+     id="g5">
+    <rect
+       width="138.92662"
+       height="138.92662"
+       fill="none"
+       id="rect1"
+       x="-10.58666"
+       y="8.4156294"
+       style="stroke-width:0.542682" />
+    <circle
+       cx="58.876644"
+       cy="106.09841"
+       r="5.0819407"
+       id="circle1"
+       style="stroke-width:0.904326;stroke-dasharray:none" />
+    <path
+       d="m 58.876643,86.561851 v -4.341458 c 9.58919,0 17.365827,-6.805233 17.365827,-15.195098 0,-8.389865 -7.776637,-15.1951 -17.365827,-15.1951 -9.58919,0 -17.365828,6.805235 -17.365828,15.1951 v 2.170729"
+       fill="none"
+       stroke="currentColor"
+       stroke-linecap="round"
+       stroke-linejoin="round"
+       stroke-width="7.49278"
+       id="path1"
+       style="stroke-width:6;stroke-dasharray:none" />
+    <circle
+       cx="58.876644"
+       cy="77.878937"
+       r="52.097481"
+       fill="none"
+       stroke="currentColor"
+       stroke-linecap="round"
+       stroke-linejoin="round"
+       stroke-width="7.49278"
+       id="circle2"
+       style="stroke-width:6;stroke-dasharray:none" />
+  </g>
+</svg>
