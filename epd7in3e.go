@@ -329,8 +329,6 @@ func (e *Epd) Init() {
 
 	e.sendCommand(POWER_ON)
 	e.waitUntilIdle()
-
-	fmt.Println("EPD initialization complete.")
 }
 
 // Clear clears the screen.

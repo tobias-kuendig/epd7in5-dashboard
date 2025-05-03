@@ -16,6 +16,14 @@ A Go application that creates a beautiful dashboard for Waveshare 7.3" E-Ink Dis
 - Waveshare 7.3" E-Ink Display HAT (E)
 - SPI and GPIO connections between the Raspberry Pi and display
 
+## Usage
+
+Run the application on the Pi to update the E-Ink display:
+
+```
+./epd
+```
+
 ## Installation
 
 1. Clone this repository:
@@ -41,14 +49,34 @@ A Go application that creates a beautiful dashboard for Waveshare 7.3" E-Ink Dis
    ```
    scp ./epd pi@raspberrypi:/home/pi/epd
    ```
+   
+8. On the Raspberry Pi, create a systemd service to run the application on boot:
+   ```
+   sudo nano /etc/systemd/system/epd.service
+   ```
+   
+    Add the following content to the file:
+    ```ini
+   [Unit]
+   Description=Rebuild EPD dashboard image
+   Wants=network-online.target
+   After=network-online.target
 
-## Usage
+   [Service]
+   Type=oneshot
+   ExecStartPre=/bin/sleep 10 # give things time to start
+   ExecStart=/home/pi/epd
 
-Run the application on the Pi to update the E-Ink display:
-
-```
-./epd
-```
+   [Install]
+   WantedBy=multi-user.target
+   ```
+   
+9. Enable the service:
+   ```
+    sudo systemctl enable epd.service
+    ```
+   
+10. The display is now renewed every boot.
 
 ## Links
 

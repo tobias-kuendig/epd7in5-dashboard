@@ -1,3 +1,5 @@
 .idea
 config/config.toml
 dash.png
+build
+build/**
