@@ -144,7 +144,7 @@ func buildAppointments(cals Calendars) ([]*Appointment, error) {
 	var start time.Time
 	var appointments []*Appointment
 
-	events, err := cals.MergedEvents(time.Now().Add(2 * 24 * time.Hour))
+	events, err := cals.MergedEvents(time.Now().Add(14 * 24 * time.Hour))
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch merged events: %w", err)
 	}
