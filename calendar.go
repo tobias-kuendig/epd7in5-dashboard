@@ -87,19 +87,15 @@ func (c *Calendar) FutureEvents(until time.Time) ([]CalendarEvent, error) {
 
 	var futureEvents []CalendarEvent
 
-	var starts, ends time.Time
+	var starts time.Time
 	for _, event := range c.Events {
-		ends, err = event.GetEndAt()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get end time: %w", err)
-		}
-
 		starts, err = event.GetStartAt()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get start time: %w", err)
+			// Skip invalid events.
+			continue
 		}
 
-		if ends.Before(time.Now()) || starts.Before(until) {
+		if starts.Before(time.Now()) || starts.After(until) {
 			continue
 		}
 
