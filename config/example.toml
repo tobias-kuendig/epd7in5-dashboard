@@ -1,4 +1,6 @@
 # Save this as config.toml
+timezone = "Europe/London"
+
 [weather]
 Latitude = 20.1234
 Longitude = 8.4321

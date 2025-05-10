@@ -415,7 +415,7 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 
 		dc.SetColor(color.Black)
 		dc.DrawStringAnchored(
-			limit(appointment.Title, 20),
+			limit(appointment.Title, 25),
 			offsetLeft,
 			float64(offsetTop),
 			0, 0,

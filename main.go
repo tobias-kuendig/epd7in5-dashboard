@@ -45,9 +45,18 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
+	if cfg.Timezone == "" {
+		log.Fatal("timezone is not set in the config")
+	}
+
+	location, err := time.LoadLocation(cfg.Timezone)
+	if err != nil {
+		log.Fatalf("failed to load timezone: %v", err)
+	}
+
 	client := openmeteogo.NewClient(nil)
 
-	appointments, err := buildAppointments(cfg.GetCalendars())
+	appointments, err := buildAppointments(cfg.GetCalendars(), location)
 	if err != nil {
 		log.Fatalf("failed to build appointments: %v", err)
 	}
@@ -139,7 +148,7 @@ func parseTime(s *string) time.Time {
 }
 
 // buildAppointments fetches the upcoming appointments from the calendars.
-func buildAppointments(cals Calendars) ([]*Appointment, error) {
+func buildAppointments(cals Calendars, location *time.Location) ([]*Appointment, error) {
 	var err error
 	var start time.Time
 	var appointments []*Appointment
@@ -157,7 +166,7 @@ func buildAppointments(cals Calendars) ([]*Appointment, error) {
 
 		appointments = append(appointments, &Appointment{
 			Title: event.GetProperty(ics.ComponentPropertySummary).Value,
-			Start: start,
+			Start: start.In(location),
 			Tag:   event.Tag,
 			Color: event.Color,
 		})

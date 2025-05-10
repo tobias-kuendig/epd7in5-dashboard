@@ -6,7 +6,8 @@ import (
 )
 
 type config struct {
-	Weather struct {
+	Timezone string `toml:"timezone"`
+	Weather  struct {
 		Latitude  float64 `toml:"latitude"`
 		Longitude float64 `toml:"longitude"`
 	} `toml:"weather"`
