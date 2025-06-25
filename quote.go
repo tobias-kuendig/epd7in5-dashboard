@@ -6,11 +6,11 @@ import (
 	"net/http"
 )
 
-var quoteEndpoint = "https://zenquotes.io/api"
+var quoteEndpoint = "https://api.zitat-service.de"
 
 type quoteResponse struct {
-	Quote  string `json:"q"`
-	Author string `json:"a"`
+	Quote  string `json:"quote"`
+	Author string `json:"authorName"`
 }
 
 type quote struct {
@@ -19,7 +19,7 @@ type quote struct {
 }
 
 func fetchQuote() quote {
-	resp, err := http.Get(quoteEndpoint + "/random")
+	resp, err := http.Get(quoteEndpoint + "/v1/quote?language=de")
 	if err != nil {
 		return quote{Text: fmt.Sprintf("failed to load quote: %s", err)}
 	}
@@ -30,17 +30,13 @@ func fetchQuote() quote {
 		return quote{Text: fmt.Sprintf("failed to load quote: %s", resp.Status)}
 	}
 
-	var quotes []quoteResponse
-	if err := json.NewDecoder(resp.Body).Decode(&quotes); err != nil {
+	var response quoteResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return quote{Text: fmt.Sprintf("failed to decode quote: %s", err)}
 	}
 
-	if len(quotes) == 0 {
-		return quote{Text: "no quote found"}
-	}
-
 	return quote{
-		Text:   quotes[0].Quote,
-		Author: quotes[0].Author,
+		Text:   response.Quote,
+		Author: response.Author,
 	}
 }
