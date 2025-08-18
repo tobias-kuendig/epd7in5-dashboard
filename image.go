@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	"io"
+	"sort"
 	"strings"
 	"time"
 
@@ -31,11 +32,13 @@ const (
 type FontSize int
 
 const (
-	FontSizeXXS FontSize = 14
-	FontSizeSM  FontSize = 17
-	FontSizeS   FontSize = 20
-	FontSizeM            = 28
-	FontSizeL            = 38
+	FontSizeXXXS FontSize = 11
+	FontSizeXXS  FontSize = 14
+	FontSizeXS   FontSize = 15
+	FontSizeSM   FontSize = 17
+	FontSizeS    FontSize = 20
+	FontSizeM             = 24
+	FontSizeL             = 38
 )
 
 // German month names
@@ -174,8 +177,9 @@ type DashboardConfig struct {
 	// Appointments is the list of appointments to display
 	Appointments []*Appointment
 	// Quote is the quote of the day to display
-	Quote   quote
-	Weather Weather
+	Quote         quote
+	Weather       Weather
+	HourlyWeather HourlyWeather
 }
 
 // Weather represents the weather data structure
@@ -188,6 +192,8 @@ type Weather struct {
 	PrecipitationSum         *float64
 	PrecipitationProbability *float64
 }
+
+type HourlyWeather map[time.Time]Weather
 
 func (w Weather) Icon() string {
 	if w.WeatherCode == nil {
@@ -253,7 +259,7 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 	dc.Stroke()
 
 	// Heading
-	err = setFont(dc, FontBold, FontSizeM)
+	err = setFont(dc, FontBold, FontSizeS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set heading font: %w", err)
 	}
@@ -261,11 +267,11 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 	dc.DrawStringAnchored(
 		localeDate(time.Now()),
 		float64(config.Width/2),
-		float64(config.Padding+40),
+		float64(config.Padding+32),
 		0.5, 0.5,
 	)
 
-	offsetTop := 110
+	offsetTop := 70
 
 	// Weather Icon
 	imageWidth := 150
@@ -317,8 +323,8 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 	)
 
 	// Weather Precipitation
-	offsetTop += 50
-	err = setFont(dc, FontRegular, FontSizeSM)
+	offsetTop += 40
+	err = setFont(dc, FontRegular, FontSizeXS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set precipitation font: %w", err)
 	}
@@ -343,7 +349,7 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 		0, -.4,
 	)
 
-	offsetTop += 32
+	offsetTop += 28
 
 	err = addImage(
 		dc,
@@ -365,8 +371,15 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 		0, -.3,
 	)
 
+	// Forecast
+	offsetTop += 26
+	err = renderForecast(dc, offsetTop, config.HourlyWeather)
+	if err != nil {
+		return nil, fmt.Errorf("error rendering forecast: %w", err)
+	}
+
 	// Appointments
-	offsetTop = 330
+	offsetTop = 370
 
 	err = drawHeading(dc, "Termine", offsetTop, config.Width, config.Padding)
 	if err != nil {
@@ -430,12 +443,12 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 	}
 
 	// Footer
-	offsetTop = 640
+	offsetTop = 630
 
-	err = drawHeading(dc, "Zitat des Tages", offsetTop, config.Width, config.Padding)
-	if err != nil {
-		return nil, fmt.Errorf("failed to draw quote heading: %w", err)
-	}
+	// Border
+	dc.SetColor(color.Black)
+	dc.DrawRectangle(float64(2*config.Padding), float64(offsetTop)+10, float64(config.Width-4*config.Padding), 2.0)
+	dc.Fill()
 
 	offsetTop += 30
 
@@ -468,6 +481,109 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 	)
 
 	return dc, nil
+}
+
+// renderForecast renders the next 6 hourly forecasts side by side
+// Each forecast shows weather icon, time (hour only), temperature, and precipitation probability
+func renderForecast(dc *gg.Context, offsetTop int, hourlyWeather HourlyWeather) error {
+	if dc == nil {
+		return fmt.Errorf("canvas is nil")
+	}
+
+	// Get sorted times from hourly weather (next 6 forecasts)
+	var times []time.Time
+
+	for t := range hourlyWeather {
+		times = append(times, t)
+	}
+
+	// sort times
+	sort.Slice(times, func(i, j int) bool {
+		return times[i].Before(times[j])
+	})
+
+	if len(times) > 7 {
+		times = times[:7]
+	}
+
+	if len(times) == 0 {
+		return nil
+	}
+
+	// Calculate layout
+	forecastWidth := 59 // Width for each forecast column
+	iconSize := 38      // Size of weather icons
+	spacing := 0        // Vertical spacing between elements
+
+	// Render each forecast
+	for i, t := range times {
+		weather := hourlyWeather[t]
+		x := float64(43 + i*forecastWidth) // Starting x position for this forecast
+		y := float64(offsetTop)
+
+		// Weather icon
+		iconPath := weather.Icon()
+		if iconPath == "" {
+			return fmt.Errorf("icon path is empty")
+		}
+
+		err := addImage(dc, iconPath, image.Point{X: int(x + float64(iconSize)/2), Y: int(y)}, iconSize, 0, 0.5, 0)
+		if err != nil {
+			return err
+		}
+
+		y += float64(50)
+
+		// Time (hour only)
+		err = setFont(dc, FontBold, FontSizeXXXS)
+		if err != nil {
+			return fmt.Errorf("failed to set time font: %w", err)
+		}
+		dc.SetColor(color.Black)
+		dc.DrawStringAnchored(
+			t.Local().Format("15:04"),
+			x+float64(iconSize)/2,
+			y,
+			0.5, 0,
+		)
+		y += 15 + float64(spacing)
+
+		// Temperature
+		err = setFont(dc, FontRegular, FontSizeXXXS)
+		if err != nil {
+			return fmt.Errorf("failed to set temperature font: %w", err)
+		}
+
+		tempStr := "N/A"
+		if weather.TemperatureHigh != nil {
+			tempStr = fmt.Sprintf("%.0f°", *weather.TemperatureHigh)
+		}
+
+		dc.DrawStringAnchored(
+			tempStr,
+			x+float64(iconSize)/2,
+			y,
+			0.5, 0,
+		)
+		y += 15 + float64(spacing)
+
+		// Precipitation probability
+		precipStr := "0%"
+		if weather.PrecipitationProbability != nil {
+			precipStr = fmt.Sprintf("%.0f%%", *weather.PrecipitationProbability)
+		}
+		if weather.PrecipitationSum != nil {
+			precipStr = fmt.Sprintf("%.1f/%s", *weather.PrecipitationSum, precipStr)
+		}
+		dc.DrawStringAnchored(
+			precipStr,
+			x+float64(iconSize)/2,
+			y,
+			0.5, 0,
+		)
+	}
+
+	return nil
 }
 
 // limit limits the length of a string to a maximum number of characters

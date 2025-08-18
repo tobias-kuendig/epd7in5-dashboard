@@ -61,16 +61,18 @@ func main() {
 		log.Fatalf("failed to build appointments: %v", err)
 	}
 
-	opts := &openmeteogo.DailyOptions{
+	weatherOptions := openmeteogo.Options{
+		Timezone:          openmeteogo.TimezoneBerlin,
+		TemperatureUnit:   openmeteogo.TemperatureUnitCelsius,
+		PrecipitationUnit: openmeteogo.PrecipitationUnitMm,
+		TimeFormat:        openmeteogo.TimeFormatIso8601,
+	}
+
+	dailyOpts := &openmeteogo.DailyOptions{
 		Latitude:     cfg.Weather.Latitude,
 		Longitude:    cfg.Weather.Longitude,
 		ForecastDays: 1,
-		Options: openmeteogo.Options{
-			Timezone:          openmeteogo.TimezoneBerlin,
-			TemperatureUnit:   openmeteogo.TemperatureUnitCelsius,
-			PrecipitationUnit: openmeteogo.PrecipitationUnitMm,
-			TimeFormat:        openmeteogo.TimeFormatIso8601,
-		},
+		Options:      weatherOptions,
 		Daily: &[]openmeteogo.OpenMeteoConst{
 			openmeteogo.DailyWeatherCode,
 			openmeteogo.DailyTemperature2mMax,
@@ -82,10 +84,30 @@ func main() {
 		},
 	}
 
-	forecast, err := client.DailyWeather.Forecast(ctx, opts)
+	dailyWeather, err := client.DailyWeather.Forecast(ctx, dailyOpts)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	hourlyOpts := &openmeteogo.HourlyOptions{
+		Latitude:     cfg.Weather.Latitude,
+		Longitude:    cfg.Weather.Longitude,
+		ForecastDays: 2,
+		Options:      weatherOptions,
+		Hourly: &[]openmeteogo.OpenMeteoConst{
+			openmeteogo.HourlyWeathercode,
+			openmeteogo.HourlyTemperature2m,
+			openmeteogo.HourlyPrecipitation,
+			openmeteogo.HourlyPrecipitationProbability,
+		},
+	}
+
+	hourlyWeather, err := client.HourlyWeather.Forecast(ctx, hourlyOpts)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_ = hourlyWeather
 
 	dashboardConfig := NewDefaultConfig()
 	quote, err := fetchQuoteRetry(10)
@@ -95,14 +117,21 @@ func main() {
 	dashboardConfig.Quote = quote
 	dashboardConfig.Appointments = appointments
 	dashboardConfig.Weather = Weather{
-		TemperatureLow:           forecast.Daily.Temperature2mMin[0],
-		TemperatureHigh:          forecast.Daily.Temperature2mMax[0],
-		WeatherCode:              forecast.Daily.WeatherCode[0],
-		Sunrise:                  parseTime(forecast.Daily.Sunrise[0]),
-		Sunset:                   parseTime(forecast.Daily.Sunset[0]),
-		PrecipitationSum:         forecast.Daily.PrecipitationSum[0],
-		PrecipitationProbability: forecast.Daily.PrecipitationProbabilityMax[0],
+		TemperatureLow:           dailyWeather.Daily.Temperature2mMin[0],
+		TemperatureHigh:          dailyWeather.Daily.Temperature2mMax[0],
+		WeatherCode:              dailyWeather.Daily.WeatherCode[0],
+		Sunrise:                  parseTime(dailyWeather.Daily.Sunrise[0]),
+		Sunset:                   parseTime(dailyWeather.Daily.Sunset[0]),
+		PrecipitationSum:         dailyWeather.Daily.PrecipitationSum[0],
+		PrecipitationProbability: dailyWeather.Daily.PrecipitationProbabilityMax[0],
 	}
+
+	hourlyWeatherData, err := HourlyWeatherFrom(hourlyWeather)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	dashboardConfig.HourlyWeather = hourlyWeatherData
 
 	canvas, err := GenerateDashboard(dashboardConfig)
 	if err != nil {
@@ -149,6 +178,79 @@ func parseTime(s *string) time.Time {
 		return time.Time{}
 	}
 	return t
+}
+
+// HourlyWeatherFrom converts hourly weather response to HourlyWeather map
+// Returns only future values starting from 06:00, every two hours until midnight
+func HourlyWeatherFrom(response *openmeteogo.HourlyWeatherResponse) (HourlyWeather, error) {
+	result := make(HourlyWeather)
+
+	if response == nil || response.Hourly.Time == nil {
+		return result, nil
+	}
+
+	now := time.Now()
+
+	targetHours := map[int]struct{}{
+		6:  {},
+		7:  {},
+		8:  {},
+		9:  {},
+		10: {},
+		11: {},
+		12: {},
+		13: {},
+		14: {},
+		15: {},
+		16: {},
+		17: {},
+		18: {},
+		19: {},
+		20: {},
+	}
+
+	for i, timeStr := range response.Hourly.Time {
+		// Parse the time string
+		t, err := time.Parse("2006-01-02T15:04", timeStr)
+		if err != nil {
+			return result, fmt.Errorf("failed to parse time: %v", err)
+		}
+
+		// Skip past times
+		if t.Before(now) {
+			continue
+		}
+
+		// Check if this hour is one of our target hours
+		if _, ok := targetHours[t.Local().Hour()]; !ok {
+			continue
+		}
+
+		var weather Weather
+
+		if response.Hourly.Temperature2m != nil && i < len(response.Hourly.Temperature2m) && response.Hourly.Temperature2m[i] != nil {
+			temp := response.Hourly.Temperature2m[i]
+			weather.TemperatureLow = temp
+			weather.TemperatureHigh = temp
+		}
+
+		if response.Hourly.WeatherCode != nil && i < len(response.Hourly.WeatherCode) && response.Hourly.WeatherCode[i] != nil {
+			code := int32(*response.Hourly.WeatherCode[i])
+			weather.WeatherCode = &code
+		}
+
+		if response.Hourly.Precipitation != nil && i < len(response.Hourly.Precipitation) && response.Hourly.Precipitation[i] != nil {
+			weather.PrecipitationSum = response.Hourly.Precipitation[i]
+		}
+
+		if response.Hourly.PrecipitationProbability != nil && i < len(response.Hourly.PrecipitationProbability) && response.Hourly.PrecipitationProbability[i] != nil {
+			weather.PrecipitationProbability = response.Hourly.PrecipitationProbability[i]
+		}
+
+		result[t] = weather
+	}
+
+	return result, nil
 }
 
 // buildAppointments fetches the upcoming appointments from the calendars.

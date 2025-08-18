@@ -3,3 +3,5 @@ config/config.toml
 dash.png
 build
 build/**
+epd
+deploy.sh
