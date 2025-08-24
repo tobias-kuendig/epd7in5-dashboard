@@ -107,14 +107,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	_ = hourlyWeather
-
 	dashboardConfig := NewDefaultConfig()
-	quote, err := fetchQuoteRetry(10)
+
+	fetchedQuote, err := fetchQuoteRetry(10)
 	if err != nil {
 		log.Fatal(err)
 	}
-	dashboardConfig.Quote = quote
+
+	dashboardConfig.Quote = fetchedQuote
 	dashboardConfig.Appointments = appointments
 	dashboardConfig.Weather = Weather{
 		TemperatureLow:           dailyWeather.Daily.Temperature2mMin[0],

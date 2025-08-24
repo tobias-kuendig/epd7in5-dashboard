@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"time"
 )
 
 var quoteEndpoint = "https://api.zitat-service.de"
@@ -13,10 +14,6 @@ var quoteEndpoint = "https://api.zitat-service.de"
 type quoteResponse struct {
 	Quote  string `json:"quote"`
 	Author string `json:"authorName"`
-}
-type categoryResponse struct {
-	Id       int    `json:"quote"`
-	Category string `json:"authorName"`
 }
 
 type quote struct {
@@ -62,6 +59,7 @@ func fetchQuoteRetry(maxRetries int) (quote, error) {
 			return q, nil
 		}
 		if errors.Is(err, errInvalidQuote) {
+			time.Sleep(time.Millisecond * 200)
 			continue
 		}
 		return quote{}, err
@@ -70,12 +68,13 @@ func fetchQuoteRetry(maxRetries int) (quote, error) {
 }
 
 func fetchQuote() (quote, error) {
-
 	categoryId := categoryIds[rand.Intn(len(categoryIds))]
+
 	language := "en"
 	if categoryId != 264 {
 		language = languages[rand.Intn(len(languages))]
 	}
+
 	resp, err := http.Get(fmt.Sprintf(quoteEndpoint+"/v1/quote?language=%s&categoryId=%d", language, categoryId))
 	if err != nil {
 		return quote{}, fmt.Errorf("%w: %w", errInvalidQuote, err)
