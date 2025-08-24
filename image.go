@@ -471,7 +471,7 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 	)
 	_, textH = dc.MeasureMultilineString(strings.Join(lines, "\n"), 1.5)
 
-	offsetTop += int(textH) + 25
+	offsetTop += int(textH) + 35
 
 	dc.DrawStringAnchored(
 		config.Quote.Author,

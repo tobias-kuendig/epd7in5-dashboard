@@ -86,8 +86,13 @@ func fetchQuote() (quote, error) {
 	}
 
 	var response quoteResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return quote{}, fmt.Errorf("decoing failed: %w: %w", errInvalidQuote, err)
+	}
+
+	// Skip long quotes,
+	if len(response.Quote) > 320 {
+		return quote{}, fmt.Errorf("quote too long: %w", errInvalidQuote)
 	}
 
 	return quote{
