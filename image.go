@@ -2,15 +2,17 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"image/color"
 	"io"
-	"sort"
+	"math"
 	"strings"
 	"time"
 
 	"github.com/fogleman/gg"
+	"github.com/go-analyze/charts"
 	"github.com/golang/freetype/truetype"
 	"github.com/nfnt/resize"
 )
@@ -177,13 +179,15 @@ type DashboardConfig struct {
 	// Appointments is the list of appointments to display
 	Appointments []*Appointment
 	// Quote is the quote of the day to display
-	Quote         quote
-	Weather       Weather
-	HourlyWeather HourlyWeather
+	Quote           quote
+	Weather         Weather
+	WeatherForecast WeatherForecast
 }
 
 // Weather represents the weather data structure
 type Weather struct {
+	Label                    string
+	Timestamp                time.Time
 	TemperatureLow           *float64
 	TemperatureHigh          *float64
 	WeatherCode              *int32
@@ -193,7 +197,7 @@ type Weather struct {
 	PrecipitationProbability *float64
 }
 
-type HourlyWeather map[time.Time]Weather
+type WeatherForecast []Weather
 
 func (w Weather) Icon() string {
 	if w.WeatherCode == nil {
@@ -274,8 +278,8 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 	offsetTop := 70
 
 	// Weather Icon
-	imageWidth := 150
-	gap := 12
+	imageWidth := 140
+	gap := 20
 	err = addImage(
 		dc,
 		config.Weather.Icon(),
@@ -322,34 +326,12 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 		0, 0,
 	)
 
-	// Weather Precipitation
-	offsetTop += 40
+	// Sunrise and Sunset
+	offsetTop += 32
 	err = setFont(dc, FontRegular, FontSizeXS)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set precipitation font: %w", err)
 	}
-
-	err = addImage(
-		dc,
-		"icons/weather/umbrella.png",
-		image.Point{X: int(offsetLeft), Y: offsetTop},
-		22, 0,
-		0.0,
-		1,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error adding parcipitation icon: %w", err)
-	}
-
-	dc.SetColor(color.Black)
-	dc.DrawStringAnchored(
-		fmt.Sprintf("%d%% / %.1fmm", int(*config.Weather.PrecipitationProbability), *config.Weather.PrecipitationSum),
-		offsetLeft+30,
-		float64(offsetTop),
-		0, -.4,
-	)
-
-	offsetTop += 28
 
 	err = addImage(
 		dc,
@@ -371,11 +353,12 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 		0, -.3,
 	)
 
-	// Forecast
-	offsetTop += 26
-	err = renderForecast(dc, offsetTop, config.HourlyWeather)
+	// Forecast Graph
+	offsetTop += 24
+
+	err = renderGraph(dc, offsetTop, config.Padding, config.WeatherForecast)
 	if err != nil {
-		return nil, fmt.Errorf("error rendering forecast: %w", err)
+		return nil, fmt.Errorf("error rendering graph: %w", err)
 	}
 
 	// Appointments
@@ -483,106 +466,103 @@ func GenerateDashboard(config *DashboardConfig) (*gg.Context, error) {
 	return dc, nil
 }
 
-// renderForecast renders the next 6 hourly forecasts side by side
-// Each forecast shows weather icon, time (hour only), temperature, and precipitation probability
-func renderForecast(dc *gg.Context, offsetTop int, hourlyWeather HourlyWeather) error {
-	if dc == nil {
-		return fmt.Errorf("canvas is nil")
-	}
+type GraphData struct {
+	TempData []float64
+	RainData []float64
+	Labels   []string
+}
 
-	// Get sorted times from hourly weather (next 6 forecasts)
-	var times []time.Time
+func renderGraph(dc *gg.Context, offsetTop, padding int, hourlyWeather WeatherForecast) error {
+	itemCount := 7
 
-	for t := range hourlyWeather {
-		times = append(times, t)
-	}
+	labels := make([]string, itemCount)
+	temps := make([]float64, itemCount)
+	rain := make([]float64, itemCount)
 
-	// sort times
-	sort.Slice(times, func(i, j int) bool {
-		return times[i].Before(times[j])
-	})
-
-	if len(times) > 7 {
-		times = times[:7]
-	}
-
-	if len(times) == 0 {
-		return nil
-	}
-
-	// Calculate layout
-	forecastWidth := 59 // Width for each forecast column
-	iconSize := 38      // Size of weather icons
-	spacing := 0        // Vertical spacing between elements
-
-	// Render each forecast
-	for i, t := range times {
-		weather := hourlyWeather[t]
-		x := float64(43 + i*forecastWidth) // Starting x position for this forecast
-		y := float64(offsetTop)
-
-		// Weather icon
-		iconPath := weather.Icon()
-		if iconPath == "" {
-			return fmt.Errorf("icon path is empty")
+	for i, weather := range hourlyWeather {
+		if i == itemCount {
+			break
 		}
-
-		err := addImage(dc, iconPath, image.Point{X: int(x + float64(iconSize)/2), Y: int(y)}, iconSize, 0, 0.5, 0)
-		if err != nil {
-			return err
-		}
-
-		y += float64(50)
-
-		// Time (hour only)
-		err = setFont(dc, FontBold, FontSizeXXXS)
-		if err != nil {
-			return fmt.Errorf("failed to set time font: %w", err)
-		}
-		dc.SetColor(color.Black)
-		dc.DrawStringAnchored(
-			t.Local().Format("15:04"),
-			x+float64(iconSize)/2,
-			y,
-			0.5, 0,
-		)
-		y += 15 + float64(spacing)
-
-		// Temperature
-		err = setFont(dc, FontRegular, FontSizeXXXS)
-		if err != nil {
-			return fmt.Errorf("failed to set temperature font: %w", err)
-		}
-
-		tempStr := "N/A"
 		if weather.TemperatureHigh != nil {
-			tempStr = fmt.Sprintf("%.0f°", *weather.TemperatureHigh)
-		}
-
-		dc.DrawStringAnchored(
-			tempStr,
-			x+float64(iconSize)/2,
-			y,
-			0.5, 0,
-		)
-		y += 15 + float64(spacing)
-
-		// Precipitation probability
-		precipStr := "0%"
-		if weather.PrecipitationProbability != nil {
-			precipStr = fmt.Sprintf("%.0f%%", *weather.PrecipitationProbability)
+			temps[i] = *weather.TemperatureHigh
 		}
 		if weather.PrecipitationSum != nil {
-			precipStr = fmt.Sprintf("%.1f/%s", *weather.PrecipitationSum, precipStr)
+			rain[i] = *weather.PrecipitationSum
 		}
-		dc.DrawStringAnchored(
-			precipStr,
-			x+float64(iconSize)/2,
-			y,
-			0.5, 0,
-		)
+		labels[i] = weather.Label
 	}
 
+	data := GraphData{
+		TempData: temps,
+		RainData: rain,
+		Labels:   labels,
+	}
+
+	tempSeries := charts.NewSeriesListLine([][]float64{data.TempData}).ToGenericSeriesList()
+	rainSeries := charts.NewSeriesListBar([][]float64{data.RainData}).ToGenericSeriesList()
+
+	if len(rainSeries) > 0 {
+		rainSeries[0].YAxisIndex = 1
+	}
+
+	mapColor := func(c color.RGBA) charts.Color {
+		return charts.Color{R: c.R, G: c.G, B: c.B, A: c.A}
+	}
+
+	theme := charts.MakeTheme(charts.ThemeOption{
+		SeriesColors:       []charts.Color{mapColor(ColorRed), mapColor(ColorBlue)},
+		TextColor:          charts.ColorBlack,
+		AxisStrokeColor:    charts.ColorBlack,
+		TextColorXAxis:     charts.ColorBlack,
+		TextColorYAxis:     charts.ColorBlack,
+		AxisSplitLineColor: charts.ColorTransparent,
+	})
+
+	labelFontSize := 10.0
+
+	opt := charts.ChartOption{
+		Theme:  theme,
+		Width:  430,
+		Height: 155,
+		XAxis: charts.XAxisOption{
+			Labels:         data.Labels,
+			LabelFontStyle: charts.FontStyle{FontSize: labelFontSize},
+		},
+		YAxis: []charts.YAxisOption{
+			{
+				Theme:          theme.WithYAxisSeriesColor(0),
+				LabelFontStyle: charts.FontStyle{FontSize: labelFontSize, FontColor: charts.ColorBlack},
+				ValueFormatter: func(f float64) string { return fmt.Sprintf("%.0f", roundFloat(f, 0)) },
+				LabelCount:     5,
+			},
+			{
+				Theme:          theme.WithYAxisSeriesColor(1),
+				LabelFontStyle: charts.FontStyle{FontSize: labelFontSize, FontColor: charts.ColorBlack},
+				Position:       "right",
+				ValueFormatter: func(f float64) string { return fmt.Sprintf("%.1f", roundFloat(f, 1)) },
+				Min:            charts.Ptr(0.0),
+				LabelCount:     5,
+			},
+		},
+		SeriesList: append(tempSeries, rainSeries...),
+	}
+
+	p, err := charts.Render(opt)
+	if err != nil {
+		return err
+	}
+
+	buf, err := p.Bytes()
+	if err != nil {
+		return err
+	}
+
+	img, _, err := image.Decode(bytes.NewReader(buf))
+	if err != nil {
+		return err
+	}
+
+	dc.DrawImageAnchored(img, padding+5, offsetTop, 0, 0)
 	return nil
 }
 
@@ -672,4 +652,9 @@ func setFont(canvas *gg.Context, style FontStyle, size FontSize) error {
 	canvas.SetFontFace(face)
 
 	return nil
+}
+
+func roundFloat(val float64, precision uint) float64 {
+	ratio := math.Pow(10, float64(precision))
+	return math.Round(val*ratio) / ratio
 }

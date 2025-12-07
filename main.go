@@ -71,7 +71,7 @@ func main() {
 	dailyOpts := &openmeteogo.DailyOptions{
 		Latitude:     cfg.Weather.Latitude,
 		Longitude:    cfg.Weather.Longitude,
-		ForecastDays: 1,
+		ForecastDays: 8,
 		Options:      weatherOptions,
 		Daily: &[]openmeteogo.OpenMeteoConst{
 			openmeteogo.DailyWeatherCode,
@@ -126,12 +126,22 @@ func main() {
 		PrecipitationProbability: dailyWeather.Daily.PrecipitationProbabilityMax[0],
 	}
 
-	hourlyWeatherData, err := HourlyWeatherFrom(hourlyWeather)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// Show the daily forecast in the evening.
+	if time.Now().Hour() >= 15 {
+		dailyWeatherData, err := DailyWeatherFrom(dailyWeather)
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	dashboardConfig.HourlyWeather = hourlyWeatherData
+		dashboardConfig.WeatherForecast = dailyWeatherData
+	} else {
+		hourlyWeatherData, err := HourlyWeatherFrom(hourlyWeather)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		dashboardConfig.WeatherForecast = hourlyWeatherData
+	}
 
 	canvas, err := GenerateDashboard(dashboardConfig)
 	if err != nil {
@@ -180,34 +190,17 @@ func parseTime(s *string) time.Time {
 	return t
 }
 
-// HourlyWeatherFrom converts hourly weather response to HourlyWeather map
-// Returns only future values starting from 06:00, every two hours until midnight
-func HourlyWeatherFrom(response *openmeteogo.HourlyWeatherResponse) (HourlyWeather, error) {
-	result := make(HourlyWeather)
+// HourlyWeatherFrom converts hourly weather response to WeatherForecast map
+func HourlyWeatherFrom(response *openmeteogo.HourlyWeatherResponse) (WeatherForecast, error) {
+	maxItems := 7
+
+	result := make(WeatherForecast, 0, maxItems)
 
 	if response == nil || response.Hourly.Time == nil {
 		return result, nil
 	}
 
 	now := time.Now()
-
-	targetHours := map[int]struct{}{
-		6:  {},
-		7:  {},
-		8:  {},
-		9:  {},
-		10: {},
-		11: {},
-		12: {},
-		13: {},
-		14: {},
-		15: {},
-		16: {},
-		17: {},
-		18: {},
-		19: {},
-		20: {},
-	}
 
 	for i, timeStr := range response.Hourly.Time {
 		// Parse the time string
@@ -221,12 +214,10 @@ func HourlyWeatherFrom(response *openmeteogo.HourlyWeatherResponse) (HourlyWeath
 			continue
 		}
 
-		// Check if this hour is one of our target hours
-		if _, ok := targetHours[t.Local().Hour()]; !ok {
-			continue
+		weather := Weather{
+			Timestamp: t,
+			Label:     t.Local().Format("15"),
 		}
-
-		var weather Weather
 
 		if response.Hourly.Temperature2m != nil && i < len(response.Hourly.Temperature2m) && response.Hourly.Temperature2m[i] != nil {
 			temp := response.Hourly.Temperature2m[i]
@@ -247,7 +238,76 @@ func HourlyWeatherFrom(response *openmeteogo.HourlyWeatherResponse) (HourlyWeath
 			weather.PrecipitationProbability = response.Hourly.PrecipitationProbability[i]
 		}
 
-		result[t] = weather
+		result = append(result, weather)
+
+		if len(result) >= maxItems {
+			break
+		}
+	}
+
+	return result, nil
+}
+
+// DailyWeatherFrom converts hourly weather response to WeatherForecast map
+func DailyWeatherFrom(response *openmeteogo.DailyWeatherResponse) (WeatherForecast, error) {
+	maxItems := 7
+
+	result := make(WeatherForecast, 0, maxItems)
+
+	if response == nil || response.Daily.Time == nil {
+		return result, nil
+	}
+
+	now := time.Now()
+
+	for i, timeStr := range response.Daily.Time {
+		// Parse the time string
+		t, err := time.Parse("2006-01-02", timeStr)
+		if err != nil {
+			return result, fmt.Errorf("failed to parse time: %v", err)
+		}
+
+		// Skip past times
+		if t.Before(now) {
+			continue
+		}
+
+		weekdays := []string{
+			"So", "Mo", "Di", "Mi", "Do", "Fr", "Sa",
+		}
+
+		weather := Weather{
+			Timestamp: t,
+			Label:     weekdays[t.Local().Weekday()],
+		}
+
+		if response.Daily.Temperature2mMax != nil && i < len(response.Daily.Temperature2mMax) && response.Daily.Temperature2mMax[i] != nil {
+			temp := response.Daily.Temperature2mMax[i]
+			weather.TemperatureHigh = temp
+		}
+		if response.Daily.Temperature2mMin != nil && i < len(response.Daily.Temperature2mMin) && response.Daily.Temperature2mMin[i] != nil {
+			temp := response.Daily.Temperature2mMin[i]
+			weather.TemperatureLow = temp
+		}
+
+		if response.Daily.WeatherCode != nil && i < len(response.Daily.WeatherCode) && response.Daily.WeatherCode[i] != nil {
+			code := *response.Daily.WeatherCode[i]
+			weather.WeatherCode = &code
+		}
+
+		if response.Daily.PrecipitationSum != nil && i < len(response.Daily.PrecipitationSum) && response.Daily.PrecipitationSum[i] != nil {
+			weather.PrecipitationSum = response.Daily.PrecipitationSum[i]
+		}
+
+		if response.Daily.PrecipitationProbabilityMax != nil && i < len(response.Daily.PrecipitationProbabilityMax) && response.Daily.PrecipitationProbabilityMax[i] != nil {
+			weather.PrecipitationProbability = response.Daily.PrecipitationProbabilityMax[i]
+		}
+
+		result = append(result, weather)
+
+		if len(result) >= maxItems {
+			break
+		}
 	}
 
 	return result, nil

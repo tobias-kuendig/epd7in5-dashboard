@@ -91,7 +91,7 @@ func fetchQuote() (quote, error) {
 	}
 
 	// Skip long quotes,
-	if len(response.Quote) > 320 {
+	if len(response.Quote) > 280 {
 		return quote{}, fmt.Errorf("quote too long: %w", errInvalidQuote)
 	}
 
