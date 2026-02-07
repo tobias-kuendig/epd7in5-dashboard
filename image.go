@@ -534,6 +534,8 @@ func renderGraph(dc *gg.Context, offsetTop, padding int, hourlyWeather WeatherFo
 				LabelFontStyle: charts.FontStyle{FontSize: labelFontSize, FontColor: charts.ColorBlack},
 				ValueFormatter: func(f float64) string { return fmt.Sprintf("%.0f", roundFloat(f, 0)) },
 				LabelCount:     5,
+				Min:            findMin(tempSeries[0].Values, 10, 5),
+				Max:            findMax(tempSeries[0].Values, 15, 5),
 			},
 			{
 				Theme:          theme.WithYAxisSeriesColor(1),
@@ -541,6 +543,7 @@ func renderGraph(dc *gg.Context, offsetTop, padding int, hourlyWeather WeatherFo
 				Position:       "right",
 				ValueFormatter: func(f float64) string { return fmt.Sprintf("%.1f", roundFloat(f, 1)) },
 				Min:            charts.Ptr(0.0),
+				Max:            findMax(rainSeries[0].Values, 16, 5),
 				LabelCount:     5,
 			},
 		},
@@ -564,6 +567,28 @@ func renderGraph(dc *gg.Context, offsetTop, padding int, hourlyWeather WeatherFo
 
 	dc.DrawImageAnchored(img, padding+5, offsetTop, 0, 0)
 	return nil
+}
+
+// findMin returns the min value of a series. If it is below minV, minV is returned.
+func findMin(values []float64, minV, increment float64) *float64 {
+	for _, v := range values {
+		if v <= minV {
+			minV -= increment
+		}
+	}
+
+	return charts.Ptr(minV)
+}
+
+// findMax returns the max value of a series. If it is below maxV, maxV is returned.
+func findMax(values []float64, maxV, increment float64) *float64 {
+	for _, v := range values {
+		if v >= maxV {
+			maxV += increment
+		}
+	}
+
+	return charts.Ptr(maxV)
 }
 
 // limit limits the length of a string to a maximum number of characters
