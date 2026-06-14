@@ -116,9 +116,19 @@ var weatherIcons = map[string][]int{
 	"stormy":        {95, 96, 99},
 }
 
+var weekdays = map[time.Weekday]string{
+	0: "So",
+	1: "Mo",
+	2: "Di",
+	3: "Mi",
+	4: "Do",
+	5: "Fr",
+	6: "Sa",
+}
+
 // localeDate formats a time.Time as a German date string (e.g., "1. Januar 2023")
 func localeDate(t time.Time) string {
-	return fmt.Sprintf("%d. %s %04d", t.Day(), months[t.Month()-1], t.Year())
+	return fmt.Sprintf("%s, %d. %s %04d", weekdays[t.Weekday()], t.Day(), months[t.Month()-1], t.Year())
 }
 
 // relativeDate formats a time.Time as a relative date string in German
@@ -479,6 +489,8 @@ func renderGraph(dc *gg.Context, offsetTop, padding int, hourlyWeather WeatherFo
 	temps := make([]float64, itemCount)
 	rain := make([]float64, itemCount)
 
+	var hasRain bool
+
 	for i, weather := range hourlyWeather {
 		if i == itemCount {
 			break
@@ -488,6 +500,9 @@ func renderGraph(dc *gg.Context, offsetTop, padding int, hourlyWeather WeatherFo
 		}
 		if weather.PrecipitationSum != nil {
 			rain[i] = *weather.PrecipitationSum
+			if rain[i] > 0 {
+				hasRain = true
+			}
 		}
 		labels[i] = weather.Label
 	}
@@ -520,6 +535,11 @@ func renderGraph(dc *gg.Context, offsetTop, padding int, hourlyWeather WeatherFo
 
 	labelFontSize := 10.0
 
+	seriesList := tempSeries
+	if hasRain {
+		seriesList = append(seriesList, rainSeries...)
+	}
+
 	opt := charts.ChartOption{
 		Theme:  theme,
 		Width:  430,
@@ -545,9 +565,10 @@ func renderGraph(dc *gg.Context, offsetTop, padding int, hourlyWeather WeatherFo
 				Min:            charts.Ptr(0.0),
 				Max:            findMax(rainSeries[0].Values, 16, 5),
 				LabelCount:     5,
+				Show:           charts.Ptr(hasRain),
 			},
 		},
-		SeriesList: append(tempSeries, rainSeries...),
+		SeriesList: seriesList,
 	}
 
 	p, err := charts.Render(opt)
